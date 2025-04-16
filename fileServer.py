@@ -13,7 +13,7 @@ progname = "fileServer"
 paramMap = params.parseParams(switchesVarDefaults)
 
 listenPort = paramMap['listenPort']
-listenAddr = ''  # all interfaces
+listenAddr = ''  #Symbolic name meaning all available interfaces
 
 if paramMap['usage']:
     params.usage()
@@ -21,9 +21,10 @@ if paramMap['usage']:
 # Set up listening socket
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.bind((listenAddr, listenPort))
-s.listen(5)  # allow up to 5 pending connections
+s.listen(5)  # changed to 5 to allow up to 5 pending connections
 print(f" Server listening on port {listenPort}...")
 
+###
 # Function to handle one client
 def handle_client(conn, addr):
     print(f"Child process handling {addr}")
@@ -38,8 +39,9 @@ def handle_client(conn, addr):
         #Unpack the filename bytes (!I converts bytes to int)
         filename_len = struct.unpack('!I', filename_len_bytes)[0]
 
-        # Step 2: Receive filename
+        # Step 2: Receive filename using the length 
         filename = conn.recv(filename_len).decode()
+        
         print(f"Receiving file: {filename}")
 
         # Step 3: Receive file data length
@@ -48,24 +50,28 @@ def handle_client(conn, addr):
 
         # Step 4: Receive file data in chunks until we get the whole thing
         received_data = b''
+        #Contiune receiving data until we read it all
         while len(received_data) < file_data_len:
+            #Get how many bytes it is 
             chunk = conn.recv(min(1024, file_data_len - len(received_data)))
+            #if we dont get anything break out of loop
             if not chunk:
                 break
+            #Add to total recieved data 
             received_data += chunk
 
         # Step 5: Write file data to new file in the server
         with open(filename, 'wb') as f:
             f.write(received_data)
 
-        print(f"✅ Saved file '{filename}' ({file_data_len} bytes)")
+        print(f"Saved file '{filename}' ({file_data_len} bytes)")
 
-        #Send acknowledgement to client
+        #Send success message back
         conn.sendall(b"File received successfully.\n")
 
     except Exception as e:
         #Close the connection and exit the child process
-        print(f"⚠️ Error while handling client {addr}: {e}")
+        print(f"Error while handling client {addr}: {e}")
     finally:
         conn.close()
         print(f"Connection to {addr} closed")
@@ -73,6 +79,7 @@ def handle_client(conn, addr):
 
 # Server main loop — accept and fork
 while True:
+    #Accept incoming client connection 
     conn, addr = s.accept()
     print(f"Connection from {addr}")
 
@@ -81,6 +88,7 @@ while True:
     if pid == 0:
         # In child process
         s.close()  # child doesn't need the listening socket
+        #Call the function to handle the file transfer
         handle_client(conn, addr)
     else:
         # In parent process
